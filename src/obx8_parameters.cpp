@@ -6,22 +6,31 @@ OBX8ParameterManager::OBX8ParameterManager() {
     addParameter(OSC1_WAVEFORM, "osc1_waveform", "Osc 1 Waveform", 0, 5, 17, 0.0, 3.0, 0.0, "", true,
                 {"Sawtooth", "Triangle", "Pulse", "Sine"});
     addParameter(OSC1_PULSE_WIDTH, "osc1_pulse_width", "Osc 1 Pulse Width", 0, 7, 18, 0.0, 127.0, 64.0, "%");
-    addParameter(OSC1_SYNC, "osc1_sync", "Osc 1 Sync", 0, 13, 19, 0.0, 1.0, 0.0, "", true, {"Off", "On"});
-    addParameter(OSC1_LEVEL, "osc1_level", "Osc 1 Level", 0, 19, 20, 0.0, 1.0, 1.0, "", true, {"Off", "On"});
+    addParameter(OSC1_LEVEL, "osc1_level", "Osc 1 Level", 0, 19, 19, 0.0, 1.0, 1.0, "", true, {"Off", "On"});
     
     // Oscillator 2 parameters
-    addParameter(OSC2_FREQUENCY, "osc2_frequency", "Osc 2 Frequency", 0, 2, 21, 0.0, 63.0, 32.0, "");
-    addParameter(OSC2_WAVEFORM, "osc2_waveform", "Osc 2 Waveform", 0, 6, 22, 0.0, 3.0, 0.0, "", true,
+    addParameter(OSC2_FREQUENCY, "osc2_frequency", "Osc 2 Frequency", 0, 2, 20, 0.0, 63.0, 32.0, "");
+    addParameter(OSC2_WAVEFORM, "osc2_waveform", "Osc 2 Waveform", 0, 6, 21, 0.0, 3.0, 0.0, "", true,
                 {"Sawtooth", "Triangle", "Pulse", "Sine"});
-    addParameter(OSC2_PULSE_WIDTH, "osc2_pulse_width", "Osc 2 Pulse Width", 0, 8, 23, 0.0, 127.0, 64.0, "%");
-    addParameter(OSC2_SYNC, "osc2_sync", "Osc 2 Sync", 0, 13, 24, 0.0, 1.0, 0.0, "", true, {"Off", "On"});
+    addParameter(OSC2_PULSE_WIDTH, "osc2_pulse_width", "Osc 2 Pulse Width", 0, 8, 22, 0.0, 127.0, 64.0, "%");
+    // OSC 2 DETUNE parameter (NRPN 3)
+    addParameter(OSC2_DETUNE, "osc2_detune", "Osc 2 Detune", 0, 3, 23, 0.0, 63.0, 32.0, "");
+    
+    // OSC SYNC is a single parameter (NRPN 13) that affects both oscillators
+    addParameter(OSC_SYNC, "osc_sync", "Osc Sync", 0, 13, 24, 0.0, 1.0, 0.0, "", true, {"Off", "On"});
     addParameter(OSC2_LEVEL, "osc2_level", "Osc 2 Level", 0, 20, 25, 0.0, 1.0, 1.0, "", true, {"Off", "On"});
+    
+    // Noise Level parameter (NRPN 21)
+    addParameter(NOISE_LEVEL, "noise_level", "Noise Level", 0, 21, 26, 0.0, 1.0, 0.0, "", true, {"Off", "On"});
     
     // Filter parameters
     addParameter(FILTER_FREQUENCY, "filter_frequency", "Filter Frequency", 0, 22, 26, 0.0, 175.0, 88.0, "");
     addParameter(FILTER_RESONANCE, "filter_resonance", "Filter Resonance", 0, 23, 27, 0.0, 127.0, 0.0, "");
     addParameter(FILTER_TRACKING, "filter_tracking", "Filter Tracking", 0, 25, 28, 0.0, 1.0, 0.0, "", true, {"Off", "On"});
-    addParameter(FILTER_POLE, "filter_pole", "Filter Pole", 0, 24, 29, 0.0, 5.0, 0.0, "", true, {"12dB LP", "24dB LP", "6dB LP", "HP", "BP", "Notch"});
+    addParameter(FILTER_POLE, "filter_pole", "Filter Type", 0, 24, 29, 0.0, 5.0, 0.0, "", true, {"12dB LP", "24dB LP", "6dB LP", "HP", "BP", "Notch"});
+    
+    // VINTAGE parameter (NRPN 26)
+    addParameter(VINTAGE, "vintage", "Vintage", 0, 26, 30, 0.0, 127.0, 64.0, "");
     
     // Envelope 1 (Filter) parameters
     addParameter(ENV1_ATTACK, "env1_attack", "Filter Env Attack", 0, 60, 30, 0.0, 255.0, 0.0, "");
@@ -46,6 +55,9 @@ OBX8ParameterManager::OBX8ParameterManager() {
     addParameter(LFO2_SHAPE, "lfo2_shape", "LFO 2 Shape", 0, 55, 42, 0.0, 5.0, 0.0, "", true,
                 {"Triangle", "Sawtooth", "Pulse", "Random", "Sine", "Sample & Hold"});
     addParameter(LFO2_AMOUNT, "lfo2_amount", "LFO 2 Depth", 0, 58, 43, 0.0, 127.0, 0.0, "");
+    
+    // Filter Modulation parameter (NRPN 59)
+    addParameter(FILTER_MODULATION, "filter_modulation", "Filter Modulation", 0, 59, 44, 0.0, 127.0, 0.0, "");
     
     // Master parameters
     addParameter(MASTER_VOLUME, "master_volume", "Program Volume", 0, 73, 7, 0.0, 127.0, 100.0, "");

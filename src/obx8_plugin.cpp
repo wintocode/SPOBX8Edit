@@ -457,16 +457,17 @@ double OBX8Plugin::denormalizeParameterValue(const OBX8Parameter* param, double 
 uint16_t OBX8Plugin::parameterToNRPNValue(const OBX8Parameter* param, double value) {
     double actual_value = denormalizeParameterValue(param, value);
     
-    // Map to 14-bit NRPN range (0-16383)
-    double range = param->max_value - param->min_value;
-    double normalized = (actual_value - param->min_value) / range;
-    
-    return static_cast<uint16_t>(normalized * 16383.0);
+    // Use the actual parameter range from the OBX8 manual, not 14-bit range
+    // The manual specifies exact ranges for each parameter
+    return static_cast<uint16_t>(std::round(actual_value));
 }
 
 double OBX8Plugin::nrpnToParameterValue(const OBX8Parameter* param, uint16_t nrpn_value) {
-    double normalized = static_cast<double>(nrpn_value) / 16383.0;
-    double actual_value = param->min_value + normalized * (param->max_value - param->min_value);
+    // Convert from hardware value directly to parameter value
+    double actual_value = static_cast<double>(nrpn_value);
+    
+    // Clamp to parameter range
+    actual_value = std::max(param->min_value, std::min(param->max_value, actual_value));
     
     return normalizeParameterValue(param, actual_value);
 }

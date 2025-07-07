@@ -52,21 +52,23 @@ enum OBX8ParamID {
     OSC1_FREQUENCY = 0,
     OSC1_WAVEFORM,
     OSC1_PULSE_WIDTH,
-    OSC1_SYNC,
     OSC1_LEVEL,
     
     // Oscillator 2
     OSC2_FREQUENCY,
     OSC2_WAVEFORM,
     OSC2_PULSE_WIDTH,
-    OSC2_SYNC,
+    OSC2_DETUNE,
+    OSC_SYNC,
     OSC2_LEVEL,
+    NOISE_LEVEL,
     
     // Filter
     FILTER_FREQUENCY,
     FILTER_RESONANCE,
     FILTER_TRACKING,
     FILTER_POLE,
+    VINTAGE,
     
     // Envelopes
     ENV1_ATTACK,
@@ -87,6 +89,7 @@ enum OBX8ParamID {
     LFO2_RATE,
     LFO2_SHAPE,
     LFO2_AMOUNT,
+    FILTER_MODULATION,
     
     // Master
     MASTER_VOLUME,
