@@ -277,7 +277,7 @@ bool MidiDeviceManager::selectDevice(const std::string& device_name) {
     selected_input_endpoint_ = 0;
     selected_output_endpoint_ = 0;
     
-    if (device_name.find("Oberheim OBX8") != std::string::npos) {
+    if (device_name.find("Oberheim OB-X8") != std::string::npos || device_name.find("Oberheim OBX8") != std::string::npos) {
         // Extract port number from friendly name
         std::string port_num = "";
         size_t port_pos = device_name.find("(Port ");
