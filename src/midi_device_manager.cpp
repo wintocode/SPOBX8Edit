@@ -200,26 +200,62 @@ void MidiDeviceManager::refreshDeviceList() {
 
 std::vector<std::string> MidiDeviceManager::getDeviceNames() const {
     std::vector<std::string> names;
-    names.push_back("None"); // Default option
+    names.push_back("None");
+    names.push_back("Auto-detect OBX8");
     
-    // Only show OBX8 devices with friendly names
+    // Track added devices to avoid duplicates
+    std::vector<std::string> added_devices;
+    
+    // Show hardware devices with improved naming
     for (const auto& device : devices_) {
         std::string lower_name = device.name;
         std::transform(lower_name.begin(), lower_name.end(), lower_name.begin(), ::tolower);
         
+        // Skip system/virtual devices
+        if (lower_name.find("iac") != std::string::npos ||
+            lower_name.find("network") != std::string::npos ||
+            lower_name.find("bus") != std::string::npos ||
+            lower_name.find("session") != std::string::npos) {
+            continue;
+        }
+        
+        std::string friendly_name;
+        
+        // Prioritize OBX8 devices with clear naming
         if (lower_name.find("obx") != std::string::npos || 
             lower_name.find("oberheim") != std::string::npos ||
             lower_name.find("ob-x8") != std::string::npos) {
             
-            // Extract port number from device ID if available
+            // Extract port info for OBX8
             std::string port_info = "";
             if (device.id.substr(0, 4) == "src_" || device.id.substr(0, 4) == "dst_") {
                 std::string port_num = device.id.substr(4);
                 port_info = " (Port " + port_num + ")";
             }
             
-            std::string friendly_name = "Oberheim OBX8" + port_info;
+            friendly_name = "🎹 Oberheim OB-X8" + port_info;
+        } else {
+            // Other hardware devices with icons
+            if (lower_name.find("moog") != std::string::npos) {
+                friendly_name = "🎛️ " + device.name;
+            } else if (lower_name.find("roland") != std::string::npos || 
+                       lower_name.find("yamaha") != std::string::npos ||
+                       lower_name.find("korg") != std::string::npos) {
+                friendly_name = "🎹 " + device.name;
+            } else if (lower_name.find("midi") != std::string::npos || 
+                       lower_name.find("usb") != std::string::npos ||
+                       lower_name.find("interface") != std::string::npos) {
+                friendly_name = "🔌 " + device.name;
+            } else {
+                // Unknown hardware device
+                friendly_name = device.name;
+            }
+        }
+        
+        // Avoid duplicates
+        if (std::find(added_devices.begin(), added_devices.end(), friendly_name) == added_devices.end()) {
             names.push_back(friendly_name);
+            added_devices.push_back(friendly_name);
         }
     }
     
