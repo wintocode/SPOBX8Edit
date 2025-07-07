@@ -24,6 +24,14 @@ make
 - Clang++ (Xcode Command Line Tools)
 - macOS 10.14+ (current target platform)
 
+### Optional Tools for Development
+- `ripgrep` (`brew install ripgrep`) - Fast search tool
+- `ninja` (`brew install ninja`) - Faster build system (use `cmake .. -G Ninja && ninja`)
+
+### Build Issues
+- If linker errors occur (`ld: open() failed`), always clean rebuild: `rm -rf build && mkdir build && cd build && cmake .. && make`
+- Incremental builds can fail due to macOS file locking with CLAP bundles
+
 The project uses CMake with custom post-build scripts to create proper macOS bundle structures for CLAP plugins.
 
 ## Architecture

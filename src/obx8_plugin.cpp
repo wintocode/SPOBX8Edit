@@ -154,6 +154,18 @@ const void* OBX8Plugin::get_extension(const char *id) {
         return &note_ports_ext;
     }
     
+    if (strcmp(id, CLAP_EXT_STATE) == 0) {
+        static const clap_plugin_state_t state_ext = {
+            .save = [](const clap_plugin_t *plugin, const clap_ostream_t *stream) -> bool {
+                return static_cast<const OBX8Plugin*>(plugin->plugin_data)->state_save(stream);
+            },
+            .load = [](const clap_plugin_t *plugin, const clap_istream_t *stream) -> bool {
+                return static_cast<OBX8Plugin*>(plugin->plugin_data)->state_load(stream);
+            }
+        };
+        return &state_ext;
+    }
+    
     return nullptr;
 }
 
@@ -201,6 +213,11 @@ bool OBX8Plugin::params_get_info(uint32_t param_index, clap_param_info_t *param_
     param_info->flags = CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE;
     if (param.is_stepped) {
         param_info->flags |= CLAP_PARAM_IS_STEPPED;
+        
+        // For MIDI device selection, mark as enum for better dropdown support
+        if (param.id == MIDI_DEVICE_SELECTION) {
+            param_info->flags |= CLAP_PARAM_IS_ENUM;
+        }
     }
     
     return true;
@@ -513,4 +530,119 @@ void OBX8Plugin::updateMidiDeviceList() {
     // Update the parameter's step names to reflect current devices
     std::vector<std::string> device_names = midi_device_manager_->getDeviceNames();
     param_manager_->updateParameterStepNames(MIDI_DEVICE_SELECTION, device_names);
+    
+    // Notify host that parameter info has changed
+    if (host_ && host_->request_restart) {
+        host_->request_restart(host_);
+    }
+}
+
+bool OBX8Plugin::state_save(const clap_ostream_t *stream) const {
+    try {
+        // Create a simple state format: version + parameter count + parameter values
+        uint32_t version = 1;
+        uint32_t param_count = static_cast<uint32_t>(param_values_.size());
+        
+        // Write version
+        if (stream->write(stream, &version, sizeof(version)) != sizeof(version)) {
+            return false;
+        }
+        
+        // Write parameter count
+        if (stream->write(stream, &param_count, sizeof(param_count)) != sizeof(param_count)) {
+            return false;
+        }
+        
+        // Write all parameter values
+        for (const auto& value : param_values_) {
+            double param_value = value;
+            if (stream->write(stream, &param_value, sizeof(param_value)) != sizeof(param_value)) {
+                return false;
+            }
+        }
+        
+        // Write selected MIDI device name (if any)
+        std::string selected_device = midi_device_manager_->getSelectedDeviceName();
+        uint32_t device_name_length = static_cast<uint32_t>(selected_device.length());
+        
+        if (stream->write(stream, &device_name_length, sizeof(device_name_length)) != sizeof(device_name_length)) {
+            return false;
+        }
+        
+        if (device_name_length > 0) {
+            if (stream->write(stream, selected_device.c_str(), device_name_length) != device_name_length) {
+                return false;
+            }
+        }
+        
+        return true;
+    } catch (...) {
+        return false;
+    }
+}
+
+bool OBX8Plugin::state_load(const clap_istream_t *stream) {
+    try {
+        // Read version
+        uint32_t version;
+        if (stream->read(stream, &version, sizeof(version)) != sizeof(version)) {
+            return false;
+        }
+        
+        // Check version compatibility
+        if (version != 1) {
+            return false; // Unsupported version
+        }
+        
+        // Read parameter count
+        uint32_t param_count;
+        if (stream->read(stream, &param_count, sizeof(param_count)) != sizeof(param_count)) {
+            return false;
+        }
+        
+        // Ensure parameter count matches current plugin
+        if (param_count > param_values_.size()) {
+            return false; // Invalid parameter count
+        }
+        
+        // Read parameter values
+        for (uint32_t i = 0; i < param_count; ++i) {
+            double param_value;
+            if (stream->read(stream, &param_value, sizeof(param_value)) != sizeof(param_value)) {
+                return false;
+            }
+            
+            if (i < param_values_.size()) {
+                param_values_[i] = param_value;
+            }
+        }
+        
+        // Read selected MIDI device name
+        uint32_t device_name_length;
+        if (stream->read(stream, &device_name_length, sizeof(device_name_length)) != sizeof(device_name_length)) {
+            return false;
+        }
+        
+        if (device_name_length > 0 && device_name_length < 1024) { // Sanity check
+            std::vector<char> device_name_buffer(device_name_length + 1);
+            if (stream->read(stream, device_name_buffer.data(), device_name_length) != device_name_length) {
+                return false;
+            }
+            device_name_buffer[device_name_length] = '\0';
+            
+            std::string device_name(device_name_buffer.data());
+            
+            // Try to select the saved MIDI device
+            midi_device_manager_->selectDevice(device_name);
+        }
+        
+        // Notify host that parameters have changed
+        if (host_ && host_->request_callback) {
+            host_->request_callback(host_);
+        }
+        
+        return true;
+    } catch (...) {
+        return false;
+    }
 }

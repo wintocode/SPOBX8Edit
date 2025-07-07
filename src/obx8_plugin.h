@@ -36,7 +36,7 @@ public:
     bool note_ports_get(uint32_t index, bool is_input, clap_note_port_info_t *info) const;
     
     // State extension
-    bool state_save(const clap_ostream_t *stream);
+    bool state_save(const clap_ostream_t *stream) const;
     bool state_load(const clap_istream_t *stream);
     
     // GUI extension
