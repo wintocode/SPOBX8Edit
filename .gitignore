@@ -1,0 +1,46 @@
+# Build directories
+build/
+Build/
+BUILD/
+
+# IDE files
+.vscode/
+.idea/
+*.xcodeproj/
+*.xcworkspace/
+
+# Compiled binaries
+*.clap
+*.dll
+*.so
+*.dylib
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+CTestTestfile.cmake
+
+# Temporary files
+*~
+*.tmp
+*.temp
+
+# Log files
+*.log
+
+# Package files
+*.tar.gz
+*.zip
+
+# Local configuration
+local.properties
+config.local.cmake
