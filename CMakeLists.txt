@@ -24,15 +24,16 @@ set_target_properties(SPOBX8Edit PROPERTIES
 
 # Platform-specific settings
 if(APPLE)
-    set_target_properties(SPOBX8Edit PROPERTIES
-        BUNDLE TRUE
-        BUNDLE_EXTENSION "clap"
-    )
-    
     # Link CoreMIDI framework on macOS
     target_link_libraries(SPOBX8Edit 
         "-framework CoreMIDI"
         "-framework CoreFoundation"
+    )
+    
+    # Create proper macOS bundle structure using script
+    add_custom_command(TARGET SPOBX8Edit POST_BUILD
+        COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/create_bundle.sh" "${CMAKE_BINARY_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}"
+        COMMENT "Creating macOS bundle structure"
     )
 endif()
 

@@ -29,6 +29,8 @@ public:
     
     uint32_t getParameterCount() const { return parameters_.size(); }
     
+    void updateParameterStepNames(uint32_t id, const std::vector<std::string>& step_names);
+    
 private:
     std::vector<OBX8Parameter> parameters_;
     std::map<uint32_t, const OBX8Parameter*> id_map_;

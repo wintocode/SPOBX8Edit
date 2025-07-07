@@ -2,6 +2,8 @@
 #include <cstring>
 #include <cmath>
 #include <algorithm>
+#include <iostream>
+#include <fstream>
 
 const clap_plugin_descriptor_t obx8_plugin_descriptor = {
     .clap_version = CLAP_VERSION_INIT,
@@ -171,7 +173,11 @@ void OBX8Plugin::initializeParameters() {
 }
 
 uint32_t OBX8Plugin::params_count() const {
-    return param_manager_->getParameterCount();
+    uint32_t count = param_manager_->getParameterCount();
+    std::ofstream debug_file("/tmp/spobx8_debug.log", std::ios::app);
+    debug_file << "*** params_count() called, returning: " << count << std::endl;
+    debug_file.close();
+    return count;
 }
 
 bool OBX8Plugin::params_get_info(uint32_t param_index, clap_param_info_t *param_info) const {
@@ -243,18 +249,29 @@ bool OBX8Plugin::params_text_to_value(clap_id param_id, const char *display, dou
 }
 
 void OBX8Plugin::params_flush(const clap_input_events_t *in, const clap_output_events_t *out) {
+    std::ofstream debug_file("/tmp/spobx8_debug.log", std::ios::app);
+    debug_file << "=== *** PARAMS_FLUSH *** called ===" << std::endl;
+    
     uint32_t event_count = in->size(in);
+    debug_file << "Event count: " << event_count << std::endl;
     
     for (uint32_t i = 0; i < event_count; ++i) {
         const clap_event_header_t *header = in->get(in, i);
+        debug_file << "Event " << i << " type: " << header->type << std::endl;
         
         if (header->type == CLAP_EVENT_PARAM_VALUE) {
             const clap_event_param_value_t *param_event = 
                 reinterpret_cast<const clap_event_param_value_t*>(header);
             
+            debug_file << "Parameter event - ID: " << param_event->param_id 
+                      << ", value: " << param_event->value << std::endl;
+            
             handleParameterChange(param_event->param_id, param_event->value);
         }
     }
+    
+    debug_file << "=== params_flush end ===" << std::endl;
+    debug_file.close();
 }
 
 uint32_t OBX8Plugin::note_ports_count(bool is_input) const {
@@ -276,26 +293,49 @@ bool OBX8Plugin::note_ports_get(uint32_t index, bool is_input, clap_note_port_in
 }
 
 void OBX8Plugin::handleParameterChange(clap_id param_id, double value) {
+    // Write to debug file
+    std::ofstream debug_file("/tmp/spobx8_debug.log", std::ios::app);
+    debug_file << "=== handleParameterChange called ===" << std::endl;
+    debug_file << "param_id: " << param_id << ", value: " << value << std::endl;
+    
     if (param_id < param_values_.size()) {
         param_values_[param_id] = value;
         
         if (param_id == MIDI_DEVICE_SELECTION) {
+            debug_file << "Calling onMidiDeviceSelected" << std::endl;
             onMidiDeviceSelected(param_id, value);
         } else {
+            debug_file << "Calling sendParameterToHardware" << std::endl;
             sendParameterToHardware(param_id, value);
         }
+    } else {
+        debug_file << "param_id out of range: " << param_id << " >= " << param_values_.size() << std::endl;
     }
+    
+    debug_file << "=== handleParameterChange end ===" << std::endl;
+    debug_file.close();
 }
 
 void OBX8Plugin::sendParameterToHardware(clap_id param_id, double value) {
+    // Write to debug file
+    std::ofstream debug_file("/tmp/spobx8_debug.log", std::ios::app);
+    debug_file << "=== sendParameterToHardware called ===" << std::endl;
+    debug_file << "param_id: " << param_id << ", value: " << value << std::endl;
+    
     const OBX8Parameter* param = param_manager_->getParameterById(param_id);
     if (!param || !midi_device_manager_->isConnected()) {
+        debug_file << "Not sending - param: " << (param ? "ok" : "null") 
+                  << ", connected: " << (midi_device_manager_->isConnected() ? "yes" : "no") << std::endl;
+        debug_file.close();
         return;
     }
     
     // Convert normalized value to NRPN value
     uint16_t nrpn_value = parameterToNRPNValue(param, value);
     uint16_t nrpn_param = (param->nrpn_msb << 7) | param->nrpn_lsb;
+    
+    debug_file << "Sending NRPN - param: " << param->display_name 
+              << ", NRPN: " << nrpn_param << ", value: " << nrpn_value << std::endl;
     
     // Send NRPN to hardware via MIDI device manager
     midi_handler_->sendNRPN(nrpn_param, nrpn_value);
@@ -304,17 +344,30 @@ void OBX8Plugin::sendParameterToHardware(clap_id param_id, double value) {
     std::vector<MidiMessage> messages;
     midi_handler_->getOutgoingMessages(messages);
     
+    debug_file << "Got " << messages.size() << " MIDI messages" << std::endl;
+    
     for (const auto& msg : messages) {
         uint8_t midi_data[3] = {msg.status, msg.data1, msg.data2};
-        midi_device_manager_->sendMidiData(midi_data, 3);
+        debug_file << "MIDI out: " << std::hex << (int)msg.status 
+                  << " " << (int)msg.data1 << " " << (int)msg.data2 << std::dec << std::endl;
+        bool sent = midi_device_manager_->sendMidiData(midi_data, 3);
+        debug_file << "Send result: " << (sent ? "success" : "failed") << std::endl;
     }
+    
+    debug_file << "=== sendParameterToHardware end ===" << std::endl;
+    debug_file.close();
 }
 
 void OBX8Plugin::processIncomingMidi(const clap_input_events_t *in_events) {
+    std::ofstream debug_file("/tmp/spobx8_debug.log", std::ios::app);
+    debug_file << "=== processIncomingMidi called ===" << std::endl;
+    
     uint32_t event_count = in_events->size(in_events);
+    debug_file << "Event count: " << event_count << std::endl;
     
     for (uint32_t i = 0; i < event_count; ++i) {
         const clap_event_header_t *header = in_events->get(in_events, i);
+        debug_file << "Event " << i << " type: " << header->type << std::endl;
         
         if (header->type == CLAP_EVENT_MIDI) {
             const clap_event_midi_t *midi_event = 
@@ -327,8 +380,20 @@ void OBX8Plugin::processIncomingMidi(const clap_input_events_t *in_events) {
             msg.timestamp = header->time;
             
             midi_handler_->processMidiMessage(msg);
+            debug_file << "Processed MIDI event" << std::endl;
+        } else if (header->type == CLAP_EVENT_PARAM_VALUE) {
+            const clap_event_param_value_t *param_event = 
+                reinterpret_cast<const clap_event_param_value_t*>(header);
+            
+            debug_file << "Parameter event - ID: " << param_event->param_id 
+                      << ", value: " << param_event->value << std::endl;
+            
+            handleParameterChange(param_event->param_id, param_event->value);
         }
     }
+    
+    debug_file << "=== processIncomingMidi end ===" << std::endl;
+    debug_file.close();
 }
 
 void OBX8Plugin::processOutgoingMidi(const clap_output_events_t *out_events) {
@@ -445,9 +510,6 @@ void OBX8Plugin::updateMidiDeviceList() {
     midi_device_manager_->refreshDeviceList();
     
     // Update the parameter's step names to reflect current devices
-    const OBX8Parameter* param = param_manager_->getParameterById(MIDI_DEVICE_SELECTION);
-    if (param) {
-        // This would require modifying the parameter manager to support dynamic step names
-        // For now, we use the fixed list but the device manager will handle the actual mapping
-    }
+    std::vector<std::string> device_names = midi_device_manager_->getDeviceNames();
+    param_manager_->updateParameterStepNames(MIDI_DEVICE_SELECTION, device_names);
 }

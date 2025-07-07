@@ -1,59 +1,59 @@
 #include "obx8_parameters.h"
 
 OBX8ParameterManager::OBX8ParameterManager() {
-    // Oscillator 1 parameters
-    addParameter(OSC1_FREQUENCY, "osc1_frequency", "Osc 1 Frequency", 0, 0, 16, -50.0, 50.0, 0.0, "cents");
-    addParameter(OSC1_WAVEFORM, "osc1_waveform", "Osc 1 Waveform", 0, 1, 17, 0.0, 4.0, 0.0, "", true,
-                {"Sawtooth", "Triangle", "Pulse", "Sine", "Noise"});
-    addParameter(OSC1_PULSE_WIDTH, "osc1_pulse_width", "Osc 1 Pulse Width", 0, 2, 18, 0.0, 127.0, 64.0, "%");
-    addParameter(OSC1_SYNC, "osc1_sync", "Osc 1 Sync", 0, 3, 19, 0.0, 1.0, 0.0, "", true, {"Off", "On"});
-    addParameter(OSC1_LEVEL, "osc1_level", "Osc 1 Level", 0, 4, 20, 0.0, 127.0, 100.0, "%");
+    // Oscillator 1 parameters - Using correct OB-X8 v2 manual NRPN numbers
+    addParameter(OSC1_FREQUENCY, "osc1_frequency", "Osc 1 Frequency", 0, 1, 16, 0.0, 63.0, 32.0, "");
+    addParameter(OSC1_WAVEFORM, "osc1_waveform", "Osc 1 Waveform", 0, 5, 17, 0.0, 3.0, 0.0, "", true,
+                {"Sawtooth", "Triangle", "Pulse", "Sine"});
+    addParameter(OSC1_PULSE_WIDTH, "osc1_pulse_width", "Osc 1 Pulse Width", 0, 7, 18, 0.0, 127.0, 64.0, "%");
+    addParameter(OSC1_SYNC, "osc1_sync", "Osc 1 Sync", 0, 13, 19, 0.0, 1.0, 0.0, "", true, {"Off", "On"});
+    addParameter(OSC1_LEVEL, "osc1_level", "Osc 1 Level", 0, 19, 20, 0.0, 1.0, 1.0, "", true, {"Off", "On"});
     
     // Oscillator 2 parameters
-    addParameter(OSC2_FREQUENCY, "osc2_frequency", "Osc 2 Frequency", 0, 5, 21, -50.0, 50.0, 0.0, "cents");
-    addParameter(OSC2_WAVEFORM, "osc2_waveform", "Osc 2 Waveform", 0, 6, 22, 0.0, 4.0, 0.0, "", true,
-                {"Sawtooth", "Triangle", "Pulse", "Sine", "Noise"});
-    addParameter(OSC2_PULSE_WIDTH, "osc2_pulse_width", "Osc 2 Pulse Width", 0, 7, 23, 0.0, 127.0, 64.0, "%");
-    addParameter(OSC2_SYNC, "osc2_sync", "Osc 2 Sync", 0, 8, 24, 0.0, 1.0, 0.0, "", true, {"Off", "On"});
-    addParameter(OSC2_LEVEL, "osc2_level", "Osc 2 Level", 0, 9, 25, 0.0, 127.0, 100.0, "%");
+    addParameter(OSC2_FREQUENCY, "osc2_frequency", "Osc 2 Frequency", 0, 2, 21, 0.0, 63.0, 32.0, "");
+    addParameter(OSC2_WAVEFORM, "osc2_waveform", "Osc 2 Waveform", 0, 6, 22, 0.0, 3.0, 0.0, "", true,
+                {"Sawtooth", "Triangle", "Pulse", "Sine"});
+    addParameter(OSC2_PULSE_WIDTH, "osc2_pulse_width", "Osc 2 Pulse Width", 0, 8, 23, 0.0, 127.0, 64.0, "%");
+    addParameter(OSC2_SYNC, "osc2_sync", "Osc 2 Sync", 0, 13, 24, 0.0, 1.0, 0.0, "", true, {"Off", "On"});
+    addParameter(OSC2_LEVEL, "osc2_level", "Osc 2 Level", 0, 20, 25, 0.0, 1.0, 1.0, "", true, {"Off", "On"});
     
     // Filter parameters
-    addParameter(FILTER_FREQUENCY, "filter_frequency", "Filter Frequency", 0, 10, 26, 0.0, 127.0, 64.0, "");
-    addParameter(FILTER_RESONANCE, "filter_resonance", "Filter Resonance", 0, 11, 27, 0.0, 127.0, 0.0, "");
-    addParameter(FILTER_TRACKING, "filter_tracking", "Filter Tracking", 0, 12, 28, 0.0, 127.0, 64.0, "");
-    addParameter(FILTER_POLE, "filter_pole", "Filter Pole", 0, 13, 29, 0.0, 1.0, 0.0, "", true, {"2-Pole", "4-Pole"});
+    addParameter(FILTER_FREQUENCY, "filter_frequency", "Filter Frequency", 0, 22, 26, 0.0, 175.0, 88.0, "");
+    addParameter(FILTER_RESONANCE, "filter_resonance", "Filter Resonance", 0, 23, 27, 0.0, 127.0, 0.0, "");
+    addParameter(FILTER_TRACKING, "filter_tracking", "Filter Tracking", 0, 25, 28, 0.0, 1.0, 0.0, "", true, {"Off", "On"});
+    addParameter(FILTER_POLE, "filter_pole", "Filter Pole", 0, 24, 29, 0.0, 5.0, 0.0, "", true, {"12dB LP", "24dB LP", "6dB LP", "HP", "BP", "Notch"});
     
-    // Envelope 1 parameters
-    addParameter(ENV1_ATTACK, "env1_attack", "Env 1 Attack", 0, 14, 30, 0.0, 127.0, 0.0, "");
-    addParameter(ENV1_DECAY, "env1_decay", "Env 1 Decay", 0, 15, 31, 0.0, 127.0, 64.0, "");
-    addParameter(ENV1_SUSTAIN, "env1_sustain", "Env 1 Sustain", 0, 16, 32, 0.0, 127.0, 100.0, "");
-    addParameter(ENV1_RELEASE, "env1_release", "Env 1 Release", 0, 17, 33, 0.0, 127.0, 64.0, "");
+    // Envelope 1 (Filter) parameters
+    addParameter(ENV1_ATTACK, "env1_attack", "Filter Env Attack", 0, 60, 30, 0.0, 255.0, 0.0, "");
+    addParameter(ENV1_DECAY, "env1_decay", "Filter Env Decay", 0, 62, 31, 0.0, 255.0, 64.0, "");
+    addParameter(ENV1_SUSTAIN, "env1_sustain", "Filter Env Sustain", 0, 64, 32, 0.0, 127.0, 100.0, "");
+    addParameter(ENV1_RELEASE, "env1_release", "Filter Env Release", 0, 66, 33, 0.0, 255.0, 64.0, "");
     
-    // Envelope 2 parameters
-    addParameter(ENV2_ATTACK, "env2_attack", "Env 2 Attack", 0, 18, 34, 0.0, 127.0, 0.0, "");
-    addParameter(ENV2_DECAY, "env2_decay", "Env 2 Decay", 0, 19, 35, 0.0, 127.0, 64.0, "");
-    addParameter(ENV2_SUSTAIN, "env2_sustain", "Env 2 Sustain", 0, 20, 36, 0.0, 127.0, 100.0, "");
-    addParameter(ENV2_RELEASE, "env2_release", "Env 2 Release", 0, 21, 37, 0.0, 127.0, 64.0, "");
+    // Envelope 2 (Volume) parameters
+    addParameter(ENV2_ATTACK, "env2_attack", "Volume Env Attack", 0, 61, 34, 0.0, 255.0, 0.0, "");
+    addParameter(ENV2_DECAY, "env2_decay", "Volume Env Decay", 0, 63, 35, 0.0, 255.0, 64.0, "");
+    addParameter(ENV2_SUSTAIN, "env2_sustain", "Volume Env Sustain", 0, 65, 36, 0.0, 127.0, 100.0, "");
+    addParameter(ENV2_RELEASE, "env2_release", "Volume Env Release", 0, 67, 37, 0.0, 255.0, 64.0, "");
     
     // LFO 1 parameters
-    addParameter(LFO1_RATE, "lfo1_rate", "LFO 1 Rate", 0, 22, 38, 0.0, 127.0, 32.0, "");
-    addParameter(LFO1_SHAPE, "lfo1_shape", "LFO 1 Shape", 0, 23, 39, 0.0, 5.0, 0.0, "", true,
-                {"Triangle", "Sawtooth", "Pulse", "Random", "Sine", "Sample & Hold"});
-    addParameter(LFO1_AMOUNT, "lfo1_amount", "LFO 1 Amount", 0, 24, 40, 0.0, 127.0, 0.0, "");
+    addParameter(LFO1_RATE, "lfo1_rate", "LFO 1 Rate", 0, 29, 38, 0.0, 127.0, 32.0, "");
+    addParameter(LFO1_SHAPE, "lfo1_shape", "LFO 1 Shape", 0, 30, 39, 0.0, 4.0, 0.0, "", true,
+                {"Triangle", "Sawtooth", "Pulse", "Random", "Sine"});
+    addParameter(LFO1_AMOUNT, "lfo1_amount", "LFO 1 Depth 1", 0, 31, 40, 0.0, 127.0, 0.0, "");
     
     // LFO 2 parameters
-    addParameter(LFO2_RATE, "lfo2_rate", "LFO 2 Rate", 0, 25, 41, 0.0, 127.0, 32.0, "");
-    addParameter(LFO2_SHAPE, "lfo2_shape", "LFO 2 Shape", 0, 26, 42, 0.0, 5.0, 0.0, "", true,
+    addParameter(LFO2_RATE, "lfo2_rate", "LFO 2 Rate", 0, 54, 41, 0.0, 127.0, 32.0, "");
+    addParameter(LFO2_SHAPE, "lfo2_shape", "LFO 2 Shape", 0, 55, 42, 0.0, 5.0, 0.0, "", true,
                 {"Triangle", "Sawtooth", "Pulse", "Random", "Sine", "Sample & Hold"});
-    addParameter(LFO2_AMOUNT, "lfo2_amount", "LFO 2 Amount", 0, 27, 43, 0.0, 127.0, 0.0, "");
+    addParameter(LFO2_AMOUNT, "lfo2_amount", "LFO 2 Depth", 0, 58, 43, 0.0, 127.0, 0.0, "");
     
     // Master parameters
-    addParameter(MASTER_VOLUME, "master_volume", "Master Volume", 0, 28, 7, 0.0, 127.0, 100.0, "");
-    addParameter(MASTER_TUNE, "master_tune", "Master Tune", 0, 29, 44, -50.0, 50.0, 0.0, "cents");
+    addParameter(MASTER_VOLUME, "master_volume", "Program Volume", 0, 73, 7, 0.0, 127.0, 100.0, "");
+    addParameter(MASTER_TUNE, "master_tune", "Master Tune", 1, 1, 44, -50.0, 50.0, 0.0, "cents");
     
-    // MIDI Device Selection parameter
-    addParameter(MIDI_DEVICE_SELECTION, "midi_device", "MIDI Device", 0, 30, 0, 0.0, 10.0, 0.0, "", true,
-                {"None", "Auto-detect OBX8", "Device 1", "Device 2", "Device 3", "Device 4", "Device 5", "Device 6", "Device 7", "Device 8", "Device 9"});
+    // MIDI Device Selection parameter (will be populated dynamically)
+    addParameter(MIDI_DEVICE_SELECTION, "midi_device", "MIDI Device", 0, 30, 0, 0.0, 1.0, 0.0, "", true,
+                {"None"});
     
     buildMaps();
 }
@@ -107,4 +107,15 @@ const OBX8Parameter* OBX8ParameterManager::getParameterByNRPN(uint16_t msb, uint
 const OBX8Parameter* OBX8ParameterManager::getParameterByCC(uint8_t cc) const {
     auto it = cc_map_.find(cc);
     return (it != cc_map_.end()) ? it->second : nullptr;
+}
+
+void OBX8ParameterManager::updateParameterStepNames(uint32_t id, const std::vector<std::string>& step_names) {
+    for (auto& param : parameters_) {
+        if (param.id == id) {
+            param.step_names = step_names;
+            // Ensure max_value is at least 1 to avoid division by zero
+            param.max_value = static_cast<double>(std::max(1, static_cast<int>(step_names.size()) - 1));
+            break;
+        }
+    }
 }

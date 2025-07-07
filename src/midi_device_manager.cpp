@@ -202,8 +202,25 @@ std::vector<std::string> MidiDeviceManager::getDeviceNames() const {
     std::vector<std::string> names;
     names.push_back("None"); // Default option
     
+    // Only show OBX8 devices with friendly names
     for (const auto& device : devices_) {
-        names.push_back(device.name);
+        std::string lower_name = device.name;
+        std::transform(lower_name.begin(), lower_name.end(), lower_name.begin(), ::tolower);
+        
+        if (lower_name.find("obx") != std::string::npos || 
+            lower_name.find("oberheim") != std::string::npos ||
+            lower_name.find("ob-x8") != std::string::npos) {
+            
+            // Extract port number from device ID if available
+            std::string port_info = "";
+            if (device.id.substr(0, 4) == "src_" || device.id.substr(0, 4) == "dst_") {
+                std::string port_num = device.id.substr(4);
+                port_info = " (Port " + port_num + ")";
+            }
+            
+            std::string friendly_name = "Oberheim OBX8" + port_info;
+            names.push_back(friendly_name);
+        }
     }
     
     return names;
@@ -216,39 +233,75 @@ bool MidiDeviceManager::selectDevice(const std::string& device_name) {
         return true;
     }
     
-    // Find the device
-    auto it = std::find_if(devices_.begin(), devices_.end(),
-        [&device_name](const MidiDeviceInfo& device) {
-            return device.name == device_name;
-        });
-    
-    if (it == devices_.end()) {
-        return false;
-    }
-    
+    // Find the device - need to handle friendly names and connect to both input and output
     selected_device_name_ = device_name;
     
 #ifdef __APPLE__
-    // Connect to the selected device
-    if (it->is_output) {
-        // Find corresponding destination endpoint
-        if (it->id.substr(0, 4) == "dst_") {
-            int index = std::stoi(it->id.substr(4));
-            selected_output_endpoint_ = MIDIGetDestination(index);
-        }
-    }
+    // Reset endpoints
+    selected_input_endpoint_ = 0;
+    selected_output_endpoint_ = 0;
     
-    if (it->is_input) {
-        // Find corresponding source endpoint
-        if (it->id.substr(0, 4) == "src_") {
-            int index = std::stoi(it->id.substr(4));
-            selected_input_endpoint_ = MIDIGetSource(index);
+    if (device_name.find("Oberheim OBX8") != std::string::npos) {
+        // Extract port number from friendly name
+        std::string port_num = "";
+        size_t port_pos = device_name.find("(Port ");
+        if (port_pos != std::string::npos) {
+            size_t end_pos = device_name.find(")", port_pos);
+            if (end_pos != std::string::npos) {
+                port_num = device_name.substr(port_pos + 6, end_pos - port_pos - 6);
+            }
+        }
+        
+        // Find both input and output devices for this port
+        for (const auto& device : devices_) {
+            std::string lower_name = device.name;
+            std::transform(lower_name.begin(), lower_name.end(), lower_name.begin(), ::tolower);
             
-            // Connect to the source
-            if (input_port_ && selected_input_endpoint_) {
-                OSStatus status = MIDIPortConnectSource(input_port_, selected_input_endpoint_, nullptr);
-                if (status == noErr) {
-                    is_connected_ = true;
+            bool is_obx8 = lower_name.find("obx") != std::string::npos || 
+                          lower_name.find("oberheim") != std::string::npos ||
+                          lower_name.find("ob-x8") != std::string::npos;
+            
+            if (is_obx8) {
+                // Connect to input (source)
+                if (device.is_input && device.id.substr(0, 4) == "src_") {
+                    if (port_num.empty() || device.id.substr(4) == port_num) {
+                        int index = std::stoi(device.id.substr(4));
+                        selected_input_endpoint_ = MIDIGetSource(index);
+                        
+                        if (input_port_ && selected_input_endpoint_) {
+                            MIDIPortConnectSource(input_port_, selected_input_endpoint_, nullptr);
+                        }
+                    }
+                }
+                
+                // Connect to output (destination)
+                if (device.is_output && device.id.substr(0, 4) == "dst_") {
+                    if (port_num.empty() || device.id.substr(4) == port_num) {
+                        int index = std::stoi(device.id.substr(4));
+                        selected_output_endpoint_ = MIDIGetDestination(index);
+                    }
+                }
+            }
+        }
+    } else {
+        // Fallback to exact name match
+        auto it = std::find_if(devices_.begin(), devices_.end(),
+            [&device_name](const MidiDeviceInfo& device) {
+                return device.name == device_name;
+            });
+        
+        if (it != devices_.end()) {
+            if (it->is_output && it->id.substr(0, 4) == "dst_") {
+                int index = std::stoi(it->id.substr(4));
+                selected_output_endpoint_ = MIDIGetDestination(index);
+            }
+            
+            if (it->is_input && it->id.substr(0, 4) == "src_") {
+                int index = std::stoi(it->id.substr(4));
+                selected_input_endpoint_ = MIDIGetSource(index);
+                
+                if (input_port_ && selected_input_endpoint_) {
+                    MIDIPortConnectSource(input_port_, selected_input_endpoint_, nullptr);
                 }
             }
         }
@@ -290,6 +343,6 @@ void MidiDeviceManager::setMidiReceiveCallback(std::function<void(const uint8_t*
 }
 
 void MidiDeviceManager::updateConnectionStatus() {
-    // Check if we have both input and output connected
-    is_connected_ = !selected_device_name_.empty();
+    // Check if we have output connected (needed for sending data to hardware)
+    is_connected_ = !selected_device_name_.empty() && selected_output_endpoint_ != 0;
 }
