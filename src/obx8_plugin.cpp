@@ -210,6 +210,13 @@ bool OBX8Plugin::params_get_info(uint32_t param_index, clap_param_info_t *param_
     param_info->max_value = 1.0;
     param_info->default_value = normalizeParameterValue(&param, param.default_value);
     
+    // For stepped parameters with multiple steps, adjust range for better DAW compatibility
+    if (param.is_stepped && param.step_names.size() > 2) {
+        // Some DAWs work better with discrete step values
+        param_info->min_value = 0.0;
+        param_info->max_value = static_cast<double>(param.step_names.size() - 1);
+    }
+    
     param_info->flags = CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE;
     if (param.is_stepped) {
         param_info->flags |= CLAP_PARAM_IS_STEPPED;
@@ -464,19 +471,35 @@ void OBX8Plugin::onCCReceived(uint8_t cc, uint8_t value) {
 }
 
 double OBX8Plugin::normalizeParameterValue(const OBX8Parameter* param, double value) const {
+    // For stepped parameters with multiple steps, normalize differently for DAW compatibility
+    if (param->is_stepped && param->step_names.size() > 2) {
+        // Return the step index directly (0, 1, 2, 3, etc.)
+        return value;
+    }
     return (value - param->min_value) / (param->max_value - param->min_value);
 }
 
 double OBX8Plugin::denormalizeParameterValue(const OBX8Parameter* param, double normalized) const {
+    // For stepped parameters with multiple steps, the value is already the step index
+    if (param->is_stepped && param->step_names.size() > 2) {
+        return normalized;
+    }
     return param->min_value + normalized * (param->max_value - param->min_value);
 }
 
 uint16_t OBX8Plugin::parameterToNRPNValue(const OBX8Parameter* param, double value) {
     double actual_value = denormalizeParameterValue(param, value);
     
+    // For stepped parameters, ensure we get exact integer values
+    if (param->is_stepped) {
+        actual_value = std::round(actual_value);
+        // Clamp to valid range
+        actual_value = std::max(param->min_value, std::min(param->max_value, actual_value));
+    }
+    
     // Use the actual parameter range from the OBX8 manual, not 14-bit range
     // The manual specifies exact ranges for each parameter
-    return static_cast<uint16_t>(std::round(actual_value));
+    return static_cast<uint16_t>(actual_value);
 }
 
 double OBX8Plugin::nrpnToParameterValue(const OBX8Parameter* param, uint16_t nrpn_value) {
