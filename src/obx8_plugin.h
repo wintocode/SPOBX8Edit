@@ -86,12 +86,23 @@ private:
     void onCCReceived(uint8_t cc, uint8_t value);
     void onMidiDeviceSelected(clap_id param_id, double value);
     void updateMidiDeviceList();
+    void autoSelectFirstOBX8Device();
     
     // Parameter conversion helpers
     double normalizeParameterValue(const OBX8Parameter* param, double value) const;
     double denormalizeParameterValue(const OBX8Parameter* param, double normalized) const;
     uint16_t parameterToNRPNValue(const OBX8Parameter* param, double value);
     double nrpnToParameterValue(const OBX8Parameter* param, uint16_t nrpn_value);
+    
+    // MIDI throttling for high-frequency modulation (LFO)
+    std::map<clap_id, uint64_t> last_param_send_time_;
+    std::map<clap_id, double> last_param_value_;
+    
+    // MIDI loop prevention
+    bool suppress_feedback_;
+    static const uint64_t MIDI_THROTTLE_MS = 5; // 5ms minimum between sends (better for LFOs)
+    uint64_t getCurrentTimeMs() const;
+    
 };
 
 // CLAP plugin descriptor

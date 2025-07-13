@@ -95,6 +95,13 @@ enum OBX8ParamID {
     MASTER_VOLUME,
     MASTER_TUNE,
     
+    // Performance
+    PORTAMENTO_RATE,
+    PROGRAM_VOLUME,
+    UNISON,
+    UNISON_VOICE_COUNT,
+    ENVELOPE_TYPE,
+    
     // MIDI Device Selection
     MIDI_DEVICE_SELECTION,
     

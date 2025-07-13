@@ -1,6 +1,7 @@
 #include "midi_device_manager.h"
 #include <algorithm>
 #include <iostream>
+#include <fstream>
 
 #ifdef __APPLE__
 #include <CoreFoundation/CoreFoundation.h>
@@ -107,6 +108,13 @@ void MidiDeviceManager::refreshDeviceList() {
         MIDIDeviceRef device = MIDIGetDevice(i);
         if (!device) continue;
         
+        // Check if device is online/connected
+        SInt32 is_offline = 0;
+        OSStatus offline_status = MIDIObjectGetIntegerProperty(device, kMIDIPropertyOffline, &is_offline);
+        if (offline_status == noErr && is_offline != 0) {
+            continue; // Skip offline devices
+        }
+        
         // Get device name
         CFStringRef name_ref = nullptr;
         OSStatus status = MIDIObjectGetStringProperty(device, kMIDIPropertyName, &name_ref);
@@ -114,6 +122,11 @@ void MidiDeviceManager::refreshDeviceList() {
         
         std::string device_name = CFStringToStdString(name_ref);
         CFRelease(name_ref);
+        
+        // Debug: Log all MIDI devices found
+        std::ofstream debug_file("/tmp/midi_debug.log", std::ios::app);
+        debug_file << "MIDI Device " << i << ": " << device_name << std::endl;
+        debug_file.close();
         
         // Check for OBX8 in the name (case insensitive)
         std::string lower_name = device_name;
@@ -159,12 +172,24 @@ void MidiDeviceManager::refreshDeviceList() {
         MIDIEndpointRef source = MIDIGetSource(i);
         if (!source) continue;
         
+        // Check if endpoint is online/connected
+        SInt32 is_offline = 0;
+        OSStatus offline_status = MIDIObjectGetIntegerProperty(source, kMIDIPropertyOffline, &is_offline);
+        if (offline_status == noErr && is_offline != 0) {
+            continue; // Skip offline endpoints
+        }
+        
         CFStringRef name_ref = nullptr;
         OSStatus status = MIDIObjectGetStringProperty(source, kMIDIPropertyName, &name_ref);
         if (status != noErr || !name_ref) continue;
         
         std::string endpoint_name = CFStringToStdString(name_ref);
         CFRelease(name_ref);
+        
+        // Debug: Log all MIDI source endpoints
+        std::ofstream debug_file("/tmp/midi_debug.log", std::ios::app);
+        debug_file << "MIDI Source " << i << ": " << endpoint_name << std::endl;
+        debug_file.close();
         
         MidiDeviceInfo info;
         info.name = endpoint_name;
@@ -180,12 +205,32 @@ void MidiDeviceManager::refreshDeviceList() {
         MIDIEndpointRef destination = MIDIGetDestination(i);
         if (!destination) continue;
         
+        // Check if endpoint is online/connected
+        SInt32 is_offline = 0;
+        OSStatus offline_status = MIDIObjectGetIntegerProperty(destination, kMIDIPropertyOffline, &is_offline);
+        if (offline_status == noErr && is_offline != 0) {
+            continue; // Skip offline endpoints
+        }
+        
         CFStringRef name_ref = nullptr;
         OSStatus status = MIDIObjectGetStringProperty(destination, kMIDIPropertyName, &name_ref);
         if (status != noErr || !name_ref) continue;
         
         std::string endpoint_name = CFStringToStdString(name_ref);
         CFRelease(name_ref);
+        
+        // Debug: Log all MIDI destination endpoints
+        std::ofstream debug_file("/tmp/midi_debug.log", std::ios::app);
+        debug_file << "MIDI Destination " << i << ": " << endpoint_name << std::endl;
+        debug_file.close();
+        
+        // Skip individual ports entirely - this includes Port 1, Port 2, etc.
+        std::string lower_endpoint_name = endpoint_name;
+        std::transform(lower_endpoint_name.begin(), lower_endpoint_name.end(), lower_endpoint_name.begin(), ::tolower);
+        
+        if (lower_endpoint_name.find("port") != std::string::npos) {
+            continue; // Skip ALL individual ports
+        }
         
         MidiDeviceInfo info;
         info.name = endpoint_name;
@@ -201,61 +246,28 @@ void MidiDeviceManager::refreshDeviceList() {
 std::vector<std::string> MidiDeviceManager::getDeviceNames() const {
     std::vector<std::string> names;
     names.push_back("None");
-    names.push_back("Auto-detect OBX8");
     
-    // Track added devices to avoid duplicates
-    std::vector<std::string> added_devices;
-    
-    // Show hardware devices with improved naming
+    // Find ONLY the main OB-X8 Module device (not individual ports)
+    bool found_obx8_main = false;
     for (const auto& device : devices_) {
-        std::string lower_name = device.name;
-        std::transform(lower_name.begin(), lower_name.end(), lower_name.begin(), ::tolower);
-        
-        // Skip system/virtual devices
-        if (lower_name.find("iac") != std::string::npos ||
-            lower_name.find("network") != std::string::npos ||
-            lower_name.find("bus") != std::string::npos ||
-            lower_name.find("session") != std::string::npos) {
+        // Only show output devices since we need to send MIDI TO the hardware
+        if (!device.is_output) {
             continue;
         }
         
-        std::string friendly_name;
+        std::string lower_name = device.name;
+        std::transform(lower_name.begin(), lower_name.end(), lower_name.begin(), ::tolower);
         
-        // Prioritize OBX8 devices with clear naming
-        if (lower_name.find("obx") != std::string::npos || 
-            lower_name.find("oberheim") != std::string::npos ||
-            lower_name.find("ob-x8") != std::string::npos) {
+        // Look for the main OB-X8 Module device (not individual ports)
+        if ((lower_name.find("obx") != std::string::npos || 
+             lower_name.find("oberheim") != std::string::npos ||
+             lower_name.find("ob-x8") != std::string::npos) &&
+            lower_name.find("port") == std::string::npos &&
+            !found_obx8_main) {
             
-            // Extract port info for OBX8
-            std::string port_info = "";
-            if (device.id.substr(0, 4) == "src_" || device.id.substr(0, 4) == "dst_") {
-                std::string port_num = device.id.substr(4);
-                port_info = " (Port " + port_num + ")";
-            }
-            
-            friendly_name = "🎹 Oberheim OB-X8" + port_info;
-        } else {
-            // Other hardware devices with icons
-            if (lower_name.find("moog") != std::string::npos) {
-                friendly_name = "🎛️ " + device.name;
-            } else if (lower_name.find("roland") != std::string::npos || 
-                       lower_name.find("yamaha") != std::string::npos ||
-                       lower_name.find("korg") != std::string::npos) {
-                friendly_name = "🎹 " + device.name;
-            } else if (lower_name.find("midi") != std::string::npos || 
-                       lower_name.find("usb") != std::string::npos ||
-                       lower_name.find("interface") != std::string::npos) {
-                friendly_name = "🔌 " + device.name;
-            } else {
-                // Unknown hardware device
-                friendly_name = device.name;
-            }
-        }
-        
-        // Avoid duplicates
-        if (std::find(added_devices.begin(), added_devices.end(), friendly_name) == added_devices.end()) {
-            names.push_back(friendly_name);
-            added_devices.push_back(friendly_name);
+            names.push_back("🎹 Oberheim OB-X8");
+            found_obx8_main = true;
+            break; // Only add one OBX8 device
         }
     }
     
@@ -277,18 +289,8 @@ bool MidiDeviceManager::selectDevice(const std::string& device_name) {
     selected_input_endpoint_ = 0;
     selected_output_endpoint_ = 0;
     
-    if (device_name.find("Oberheim OB-X8") != std::string::npos || device_name.find("Oberheim OBX8") != std::string::npos) {
-        // Extract port number from friendly name
-        std::string port_num = "";
-        size_t port_pos = device_name.find("(Port ");
-        if (port_pos != std::string::npos) {
-            size_t end_pos = device_name.find(")", port_pos);
-            if (end_pos != std::string::npos) {
-                port_num = device_name.substr(port_pos + 6, end_pos - port_pos - 6);
-            }
-        }
-        
-        // Find both input and output devices for this port
+    if (device_name.find("Oberheim OB-X8") != std::string::npos) {
+        // Find the OBX8 device by name match
         for (const auto& device : devices_) {
             std::string lower_name = device.name;
             std::transform(lower_name.begin(), lower_name.end(), lower_name.begin(), ::tolower);
@@ -297,26 +299,10 @@ bool MidiDeviceManager::selectDevice(const std::string& device_name) {
                           lower_name.find("oberheim") != std::string::npos ||
                           lower_name.find("ob-x8") != std::string::npos;
             
-            if (is_obx8) {
-                // Connect to input (source)
-                if (device.is_input && device.id.substr(0, 4) == "src_") {
-                    if (port_num.empty() || device.id.substr(4) == port_num) {
-                        int index = std::stoi(device.id.substr(4));
-                        selected_input_endpoint_ = MIDIGetSource(index);
-                        
-                        if (input_port_ && selected_input_endpoint_) {
-                            MIDIPortConnectSource(input_port_, selected_input_endpoint_, nullptr);
-                        }
-                    }
-                }
-                
-                // Connect to output (destination)
-                if (device.is_output && device.id.substr(0, 4) == "dst_") {
-                    if (port_num.empty() || device.id.substr(4) == port_num) {
-                        int index = std::stoi(device.id.substr(4));
-                        selected_output_endpoint_ = MIDIGetDestination(index);
-                    }
-                }
+            if (is_obx8 && device.is_output && device.id.substr(0, 4) == "dst_") {
+                int index = std::stoi(device.id.substr(4));
+                selected_output_endpoint_ = MIDIGetDestination(index);
+                break; // Use the first matching OBX8 output device
             }
         }
     } else {

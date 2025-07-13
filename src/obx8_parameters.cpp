@@ -1,17 +1,21 @@
 #include "obx8_parameters.h"
 
 OBX8ParameterManager::OBX8ParameterManager() {
+    // MIDI Device Selector - First parameter for easy access
+    addParameter(MIDI_DEVICE_SELECTION, "midi_device", "MIDI Device", 0, 30, 0, 0.0, 1.0, 0.0, "", true,
+                {});
+    
     // Oscillator 1 parameters - Using correct OB-X8 v2 manual NRPN numbers
     addParameter(OSC1_FREQUENCY, "osc1_frequency", "Osc 1 Frequency", 0, 1, 16, 0.0, 63.0, 32.0, "");
     addParameter(OSC1_WAVEFORM, "osc1_waveform", "Osc 1 Waveform", 0, 5, 17, 0.0, 3.0, 0.0, "", true,
-                {"Sawtooth", "Triangle", "Pulse", "Sine"});
+                {"Triangle", "Sawtooth", "Pulse", "Pulse+Saw"});
     addParameter(OSC1_PULSE_WIDTH, "osc1_pulse_width", "Osc 1 Pulse Width", 0, 7, 18, 0.0, 127.0, 64.0, "%");
     addParameter(OSC1_LEVEL, "osc1_level", "Osc 1 Level", 0, 19, 19, 0.0, 1.0, 1.0, "", true, {"Off", "On"});
     
     // Oscillator 2 parameters
     addParameter(OSC2_FREQUENCY, "osc2_frequency", "Osc 2 Frequency", 0, 2, 20, 0.0, 63.0, 32.0, "");
     addParameter(OSC2_WAVEFORM, "osc2_waveform", "Osc 2 Waveform", 0, 6, 21, 0.0, 3.0, 0.0, "", true,
-                {"Sawtooth", "Triangle", "Pulse", "Sine"});
+                {"Triangle", "Sawtooth", "Pulse", "Pulse+Saw"});
     addParameter(OSC2_PULSE_WIDTH, "osc2_pulse_width", "Osc 2 Pulse Width", 0, 8, 22, 0.0, 127.0, 64.0, "%");
     // OSC 2 DETUNE parameter (NRPN 3)
     addParameter(OSC2_DETUNE, "osc2_detune", "Osc 2 Detune", 0, 3, 23, 0.0, 63.0, 32.0, "");
@@ -27,7 +31,7 @@ OBX8ParameterManager::OBX8ParameterManager() {
     addParameter(FILTER_FREQUENCY, "filter_frequency", "Filter Frequency", 0, 22, 26, 0.0, 175.0, 88.0, "");
     addParameter(FILTER_RESONANCE, "filter_resonance", "Filter Resonance", 0, 23, 27, 0.0, 127.0, 0.0, "");
     addParameter(FILTER_TRACKING, "filter_tracking", "Filter Tracking", 0, 25, 28, 0.0, 1.0, 0.0, "", true, {"Off", "On"});
-    addParameter(FILTER_POLE, "filter_pole", "Filter Type", 0, 24, 29, 0.0, 5.0, 0.0, "", true, {"12dB LP", "24dB LP", "6dB LP", "HP", "BP", "Notch"});
+    addParameter(FILTER_POLE, "filter_pole", "Filter Type", 0, 24, 29, 0.0, 6.0, 0.0, "", true, {"OB-X/SEM 2-Pole LP", "SEM 2-Pole HP", "SEM 2-Pole BP", "SEM 2-Pole Notch", "OB-Xa/8 2-Pole LP", "OB-Xa/8 4-Pole LP", "Modified 4-Pole LP"});
     
     // VINTAGE parameter (NRPN 26)
     addParameter(VINTAGE, "vintage", "Vintage", 0, 26, 30, 0.0, 127.0, 64.0, "");
@@ -46,8 +50,8 @@ OBX8ParameterManager::OBX8ParameterManager() {
     
     // LFO 1 parameters
     addParameter(LFO1_RATE, "lfo1_rate", "LFO 1 Rate", 0, 29, 38, 0.0, 127.0, 32.0, "");
-    addParameter(LFO1_SHAPE, "lfo1_shape", "LFO 1 Shape", 0, 30, 39, 0.0, 4.0, 0.0, "", true,
-                {"Triangle", "Sawtooth", "Pulse", "Random", "Sine"});
+    addParameter(LFO1_SHAPE, "lfo1_shape", "LFO 1 Shape", 0, 30, 39, 0.0, 5.0, 0.0, "", true,
+                {"Sine", "Saw Up", "Saw Down", "Triangle", "Square", "Sample & Hold"});
     addParameter(LFO1_AMOUNT, "lfo1_amount", "LFO 1 Depth 1", 0, 31, 40, 0.0, 127.0, 0.0, "");
     
     // LFO 2 parameters
@@ -63,9 +67,12 @@ OBX8ParameterManager::OBX8ParameterManager() {
     addParameter(MASTER_VOLUME, "master_volume", "Program Volume", 0, 73, 7, 0.0, 127.0, 100.0, "");
     addParameter(MASTER_TUNE, "master_tune", "Master Tune", 1, 1, 44, -50.0, 50.0, 0.0, "cents");
     
-    // MIDI Device Selection parameter (will be populated dynamically)
-    addParameter(MIDI_DEVICE_SELECTION, "midi_device", "MIDI Device", 0, 30, 0, 0.0, 1.0, 0.0, "", true,
-                {"None"});
+    // Performance parameters
+    addParameter(PORTAMENTO_RATE, "portamento_rate", "Portamento Rate", 0, 14, 0, 0.0, 127.0, 0.0, "");
+    addParameter(PROGRAM_VOLUME, "program_volume", "Program Volume", 0, 73, 0, 0.0, 127.0, 100.0, "");
+    addParameter(UNISON, "unison", "Unison", 0, 74, 0, 0.0, 1.0, 0.0, "", true, {"Off", "On"});
+    addParameter(UNISON_VOICE_COUNT, "unison_voice_count", "Unison Voice Count", 0, 75, 0, 0.0, 7.0, 2.0, "", true, {"2", "3", "4", "5", "6", "7", "8"});
+    addParameter(ENVELOPE_TYPE, "envelope_type", "Envelope Type", 0, 96, 0, 0.0, 2.0, 0.0, "", true, {"ADSR", "Multi-Trigger", "Free-Run"});
     
     buildMaps();
 }

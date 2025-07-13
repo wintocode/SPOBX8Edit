@@ -4,6 +4,8 @@
 #include <algorithm>
 #include <iostream>
 #include <fstream>
+#include <chrono>
+#include <map>
 
 const clap_plugin_descriptor_t obx8_plugin_descriptor = {
     .clap_version = CLAP_VERSION_INIT,
@@ -33,7 +35,8 @@ OBX8Plugin::OBX8Plugin(const clap_host_t *host)
     , gui_created_(false)
     , gui_scale_(1.0)
     , gui_width_(800)
-    , gui_height_(600) {
+    , gui_height_(600)
+    , suppress_feedback_(false) {
     
     initializeParameters();
     
@@ -98,6 +101,11 @@ void OBX8Plugin::reset() {
 clap_process_status OBX8Plugin::process(const clap_process_t *process) {
     // Process incoming MIDI events
     processIncomingMidi(process->in_events);
+    
+    // Process parameter automation (including Bitwig LFOs)
+    if (process->in_events && process->out_events) {
+        params_flush(process->in_events, process->out_events);
+    }
     
     // Process outgoing MIDI events
     processOutgoingMidi(process->out_events);
@@ -182,6 +190,9 @@ void OBX8Plugin::initializeParameters() {
             param_values_[i] = normalizeParameterValue(&params[i], params[i].default_value);
         }
     }
+    
+    // Auto-select first OBX8 device if available
+    autoSelectFirstOBX8Device();
 }
 
 uint32_t OBX8Plugin::params_count() const {
@@ -206,16 +217,10 @@ bool OBX8Plugin::params_get_info(uint32_t param_index, clap_param_info_t *param_
     strncpy(param_info->module, "OBX8", sizeof(param_info->module) - 1);
     param_info->module[sizeof(param_info->module) - 1] = '\0';
     
+    // Always register parameters with normalized 0.0-1.0 range for CLAP automation compatibility
     param_info->min_value = 0.0;
     param_info->max_value = 1.0;
     param_info->default_value = normalizeParameterValue(&param, param.default_value);
-    
-    // For stepped parameters with multiple steps, adjust range for better DAW compatibility
-    if (param.is_stepped && param.step_names.size() > 2) {
-        // Some DAWs work better with discrete step values
-        param_info->min_value = 0.0;
-        param_info->max_value = static_cast<double>(param.step_names.size() - 1);
-    }
     
     param_info->flags = CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE;
     if (param.is_stepped) {
@@ -277,20 +282,52 @@ void OBX8Plugin::params_flush(const clap_input_events_t *in, const clap_output_e
     debug_file << "=== *** PARAMS_FLUSH *** called ===" << std::endl;
     
     uint32_t event_count = in->size(in);
-    debug_file << "Event count: " << event_count << std::endl;
+    debug_file << "*** BITWIG LFO TEST *** Event count: " << event_count << std::endl;
     
     for (uint32_t i = 0; i < event_count; ++i) {
         const clap_event_header_t *header = in->get(in, i);
-        debug_file << "Event " << i << " type: " << header->type << std::endl;
+        debug_file << "*** BITWIG *** Event " << i << " type: " << header->type 
+                   << " (PARAM_VALUE=" << CLAP_EVENT_PARAM_VALUE << ", PARAM_MOD=" << CLAP_EVENT_PARAM_MOD << ", MIDI=" << CLAP_EVENT_MIDI << ")" << std::endl;
         
         if (header->type == CLAP_EVENT_PARAM_VALUE) {
             const clap_event_param_value_t *param_event = 
                 reinterpret_cast<const clap_event_param_value_t*>(header);
             
-            debug_file << "Parameter event - ID: " << param_event->param_id 
+            const OBX8Parameter* param = param_manager_->getParameterById(param_event->param_id);
+            debug_file << "*** AUTOMATION EVENT *** - ID: " << param_event->param_id 
+                      << " (" << (param ? param->display_name : "UNKNOWN") << ")"
                       << ", value: " << param_event->value << std::endl;
             
             handleParameterChange(param_event->param_id, param_event->value);
+        } else if (header->type == CLAP_EVENT_PARAM_MOD) {
+            const clap_event_param_mod_t *mod_event = 
+                reinterpret_cast<const clap_event_param_mod_t*>(header);
+            
+            const OBX8Parameter* param = param_manager_->getParameterById(mod_event->param_id);
+            debug_file << "*** BITWIG LFO MOD EVENT *** - ID: " << mod_event->param_id 
+                      << " (" << (param ? param->display_name : "UNKNOWN") << ")"
+                      << ", modulation amount: " << mod_event->amount << std::endl;
+            
+            // For LFO modulation, scale Bitwig's large values to reasonable range
+            if (mod_event->param_id < param_values_.size()) {
+                // Get the BASE parameter value (not previously modulated value)
+                double base_value = param_values_[mod_event->param_id];
+                
+                // Scale Bitwig's large modulation values (~10) to normalized range (0-1)
+                // Assuming max Bitwig mod ~10.0 maps to full parameter range
+                double normalized_mod = mod_event->amount / 10.0;
+                
+                // Simple additive modulation with clamping
+                double modulated_value = base_value + normalized_mod;
+                modulated_value = std::max(0.0, std::min(1.0, modulated_value));
+                
+                debug_file << "Base: " << base_value << ", Raw Mod: " << mod_event->amount 
+                          << ", Normalized Mod: " << normalized_mod << ", Final: " << modulated_value << std::endl;
+                
+                // Send modulated value to hardware but DON'T store it back to param_values_
+                // This prevents feedback loops
+                sendParameterToHardware(mod_event->param_id, modulated_value);
+            }
         }
     }
     
@@ -349,6 +386,29 @@ void OBX8Plugin::sendParameterToHardware(clap_id param_id, double value) {
     debug_file << "=== sendParameterToHardware called ===" << std::endl;
     debug_file << "param_id: " << param_id << ", value: " << value << std::endl;
     
+    // MIDI throttling for high-frequency modulation (LFO) 
+    uint64_t current_time = getCurrentTimeMs();
+    auto last_time_it = last_param_send_time_.find(param_id);
+    auto last_value_it = last_param_value_.find(param_id);
+    
+    // Check if we should throttle based on time and value change
+    if (last_time_it != last_param_send_time_.end() && last_value_it != last_param_value_.end()) {
+        uint64_t time_since_last = current_time - last_time_it->second;
+        double value_change = std::abs(value - last_value_it->second);
+        
+        // Throttle if too soon AND value change is small (more permissive for LFOs)
+        if (time_since_last < MIDI_THROTTLE_MS && value_change < 0.005) {
+            debug_file << "Throttling parameter send - too soon (" << time_since_last 
+                      << "ms) and small change (" << value_change << ")" << std::endl;
+            debug_file.close();
+            return;
+        }
+    }
+    
+    // Update tracking
+    last_param_send_time_[param_id] = current_time;
+    last_param_value_[param_id] = value;
+    
     const OBX8Parameter* param = param_manager_->getParameterById(param_id);
     if (!param || !midi_device_manager_->isConnected()) {
         debug_file << "Not sending - param: " << (param ? "ok" : "null") 
@@ -364,8 +424,10 @@ void OBX8Plugin::sendParameterToHardware(clap_id param_id, double value) {
     debug_file << "Sending NRPN - param: " << param->display_name 
               << ", NRPN: " << nrpn_param << ", value: " << nrpn_value << std::endl;
     
-    // Send NRPN to hardware via MIDI device manager
+    // Send NRPN to hardware via MIDI device manager - suppress feedback
+    suppress_feedback_ = true;
     midi_handler_->sendNRPN(nrpn_param, nrpn_value);
+    suppress_feedback_ = false;
     
     // Get outgoing MIDI messages and send them through device manager
     std::vector<MidiMessage> messages;
@@ -394,7 +456,7 @@ void OBX8Plugin::processIncomingMidi(const clap_input_events_t *in_events) {
     
     for (uint32_t i = 0; i < event_count; ++i) {
         const clap_event_header_t *header = in_events->get(in_events, i);
-        debug_file << "Event " << i << " type: " << header->type << std::endl;
+        debug_file << "Event " << i << " type: " << header->type << " (CLAP_EVENT_PARAM_VALUE=" << CLAP_EVENT_PARAM_VALUE << ")" << std::endl;
         
         if (header->type == CLAP_EVENT_MIDI) {
             const clap_event_midi_t *midi_event = 
@@ -409,13 +471,8 @@ void OBX8Plugin::processIncomingMidi(const clap_input_events_t *in_events) {
             midi_handler_->processMidiMessage(msg);
             debug_file << "Processed MIDI event" << std::endl;
         } else if (header->type == CLAP_EVENT_PARAM_VALUE) {
-            const clap_event_param_value_t *param_event = 
-                reinterpret_cast<const clap_event_param_value_t*>(header);
-            
-            debug_file << "Parameter event - ID: " << param_event->param_id 
-                      << ", value: " << param_event->value << std::endl;
-            
-            handleParameterChange(param_event->param_id, param_event->value);
+            // Skip parameter events here - they're handled in params_flush()
+            debug_file << "Skipping parameter event in processIncomingMidi (handled in params_flush)" << std::endl;
         }
     }
     
@@ -444,6 +501,11 @@ void OBX8Plugin::processOutgoingMidi(const clap_output_events_t *out_events) {
 }
 
 void OBX8Plugin::onNRPNReceived(uint16_t parameter, uint16_t value) {
+    // Skip feedback if this NRPN was sent by automation
+    if (suppress_feedback_) {
+        return;
+    }
+    
     // Find parameter by NRPN
     uint16_t nrpn_msb = (parameter >> 7) & 0x7F;
     uint16_t nrpn_lsb = parameter & 0x7F;
@@ -453,7 +515,7 @@ void OBX8Plugin::onNRPNReceived(uint16_t parameter, uint16_t value) {
         double normalized_value = nrpnToParameterValue(param, value);
         param_values_[param->id] = normalized_value;
         
-        // Notify host of parameter change
+        // Notify host of parameter change (only for hardware knob changes)
         if (host_ && host_->request_callback) {
             host_->request_callback(host_);
         }
@@ -527,24 +589,7 @@ void OBX8Plugin::onMidiDeviceSelected(clap_id param_id, double value) {
     if (device_index >= 0 && device_index < static_cast<int>(device_names.size())) {
         std::string selected_device = device_names[device_index];
         
-        if (selected_device == "Auto-detect OBX8") {
-            // Find first OBX8 device
-            midi_device_manager_->refreshDeviceList();
-            const auto& devices = midi_device_manager_->getDevices();
-            
-            for (const auto& device : devices) {
-                std::string lower_name = device.name;
-                std::transform(lower_name.begin(), lower_name.end(), lower_name.begin(), ::tolower);
-                if (lower_name.find("obx") != std::string::npos || 
-                    lower_name.find("oberheim") != std::string::npos) {
-                    midi_device_manager_->selectDevice(device.name);
-                    return;
-                }
-            }
-            
-            // If no OBX8 found, select none
-            midi_device_manager_->selectDevice("None");
-        } else {
+        if (selected_device != "None") {
             midi_device_manager_->selectDevice(selected_device);
         }
     }
@@ -670,5 +715,28 @@ bool OBX8Plugin::state_load(const clap_istream_t *stream) {
         return true;
     } catch (...) {
         return false;
+    }
+}
+
+uint64_t OBX8Plugin::getCurrentTimeMs() const {
+    auto now = std::chrono::steady_clock::now();
+    auto duration = now.time_since_epoch();
+    return std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
+}
+
+void OBX8Plugin::autoSelectFirstOBX8Device() {
+    auto device_names = midi_device_manager_->getDeviceNames();
+    
+    // Look for first OBX8 device in the list (skip "None" at index 0)
+    for (size_t i = 1; i < device_names.size(); ++i) {
+        const std::string& device_name = device_names[i];
+        if (device_name.find("Oberheim OB-X8") != std::string::npos) {
+            // Set MIDI device parameter to this device
+            param_values_[MIDI_DEVICE_SELECTION] = static_cast<double>(i);
+            
+            // Actually select the device
+            midi_device_manager_->selectDevice(device_name);
+            return;
+        }
     }
 }
