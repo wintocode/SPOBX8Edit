@@ -1,8 +1,8 @@
 #include "obx8_parameters.h"
 
 OBX8ParameterManager::OBX8ParameterManager() {
-    // MIDI Device Selector - First parameter for easy access
-    addParameter(MIDI_DEVICE_SELECTION, "midi_device", "MIDI Device", 0, 30, 0, 0.0, 1.0, 0.0, "", true,
+    // MIDI Device Selector - Removed NRPN 30 conflict (now uses no NRPN)
+    addParameter(MIDI_DEVICE_SELECTION, "midi_device", "MIDI Device", 0, 0, 0, 0.0, 1.0, 0.0, "", true,
                 {});
     
     // Oscillator 1 parameters - Using correct OB-X8 v2 manual NRPN numbers
@@ -57,7 +57,7 @@ OBX8ParameterManager::OBX8ParameterManager() {
     // LFO 2 parameters
     addParameter(LFO2_RATE, "lfo2_rate", "LFO 2 Rate", 0, 54, 41, 0.0, 127.0, 32.0, "");
     addParameter(LFO2_SHAPE, "lfo2_shape", "LFO 2 Shape", 0, 55, 42, 0.0, 5.0, 0.0, "", true,
-                {"Triangle", "Sawtooth", "Pulse", "Random", "Sine", "Sample & Hold"});
+                {"Triangle", "Square", "Saw Up", "S&H", "Saw Down", "Noise"});
     addParameter(LFO2_AMOUNT, "lfo2_amount", "LFO 2 Depth", 0, 58, 43, 0.0, 127.0, 0.0, "");
     
     // Filter Modulation parameter (NRPN 59)
